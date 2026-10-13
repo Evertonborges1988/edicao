@@ -29,7 +29,8 @@ Verifique com `ffmpeg -version` e `whisper --help`. Se faltar algo, avise o usu√
 O script `scripts/editar.py` faz o fluxo completo:
 
 ```bash
-python3 .claude/skills/editor-video-alta-retencao/scripts/editar.py entrada.mp4 saida.mp4 \
+# No Windows use `python` no lugar de `python3`; o script fica em ~/.claude/skills/ (ou .claude/skills/ do projeto)
+python3 ~/.claude/skills/editor-video-alta-retencao/scripts/editar.py entrada.mp4 saida.mp4 \
   --modelo small --idioma pt --silencio 0.35 --formato 9x16
 ```
 
