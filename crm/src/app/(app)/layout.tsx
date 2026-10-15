@@ -11,7 +11,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {children}
       <nav className="fixed inset-x-0 bottom-0 mx-auto flex max-w-md border-t bg-white text-center text-sm">
         <Link href="/agenda" className="flex-1 py-3 font-semibold text-brand">Agenda</Link>
-        <span className="flex-1 py-3 text-gray-400">Clientes (em breve)</span>
+        <Link href="/clientes" className="flex-1 py-3 font-semibold text-brand">Clientes</Link>
       </nav>
     </div>
   );
