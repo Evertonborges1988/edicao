@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Palavra Viva · Estudo Bíblico</title>
+<meta name="description" content="Estudo bíblico com busca por palavra e referência, e conteúdos relacionados a cada versículo.">
+<link rel="icon" href="logo.svg">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="top">
+  <button id="menuBtn" aria-label="Abrir menu de livros">☰</button>
+  <a class="brand" href="#/" aria-label="Palavra Viva — início"><img src="logo.svg" alt="" width="36" height="36"><span><b>Palavra Viva</b><small>Estudo Bíblico · PIB Gravataí</small></span></a>
+  <form id="searchForm" role="search"><input id="q" type="search" placeholder="Busque uma palavra ou referência (ex.: João 3:16)" autocomplete="off" aria-label="Buscar"><button>Buscar</button></form>
+</header>
+<div class="layout">
+  <nav id="side" aria-label="Livros da Bíblia"></nav>
+  <main id="main" tabindex="-1"></main>
+</div>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
