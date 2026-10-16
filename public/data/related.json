@@ -1,1 +1,38 @@
-{}
+{
+  "_default": {
+    "AT": { "books": [{ "title": "O Antigo Testamento Interpretado Versículo por Versículo", "author": "Russell N. Champlin", "note": "Comentário geral (Hagnos)." }] },
+    "NT": { "books": [{ "title": "O Novo Testamento Interpretado Versículo por Versículo", "author": "Russell N. Champlin", "note": "Comentário geral (Hagnos)." }] }
+  },
+  "18.23": {
+    "books": [{ "title": "Um Pastor Olha para o Salmo 23", "author": "W. Phillip Keller", "note": "O salmo lido pela experiência de um pastor de ovelhas." }],
+    "videos": [
+      { "id": "Wb85oQvC1qQ", "title": "Salmo 23 Estudo: O Senhor é o meu Pastor (Bíblia Explicada)" },
+      { "id": "pv5ZNVG6Dhw", "title": "Salmos 23 — todos os versículos com explicação" }
+    ]
+  },
+  "42.3.16": {
+    "books": [
+      { "title": "O Evangelho de João", "author": "Leon Morris", "note": "Comentário exegético." },
+      { "title": "O Comentário de João", "author": "D. A. Carson", "note": "Comentário exegético (Shedd Publicações)." }
+    ],
+    "videos": [
+      { "id": "N9JvE7m0JJo", "title": "João 3:16 explicado: um estudo detalhado" },
+      { "id": "Jp84gsMWIZc", "title": "Pregação João 3.16 — Porque Deus amou o mundo" },
+      { "id": "6Ns9MVUFvDU", "title": "Pregação sobre João 3:16" }
+    ]
+  },
+  "44.8.28": {
+    "books": [
+      { "title": "A Mensagem de Romanos", "author": "John Stott", "note": "Exposição da carta (ABU)." },
+      { "title": "Romanos: exposição sobre o capítulo 8", "author": "D. Martyn Lloyd-Jones", "note": "Exposição detalhada de Romanos 8 (PES)." }
+    ],
+    "videos": [{ "id": "ME3Hts41Lhs", "title": "Romanos 8:28" }]
+  },
+  "49.4.13": {
+    "books": [{ "title": "Filipenses (Comentário do Novo Testamento)", "author": "William Hendriksen", "note": "Cultura Cristã." }],
+    "videos": [
+      { "id": "20cVtllVDfM", "title": "Exegese de Filipenses 4:13 — o segredo por trás do que Paulo disse" },
+      { "id": "K0u5mCacfow", "title": "Tudo posso naquele que me fortalece — Filipenses 4:13 (Pr. Sidnei Luiz)" }
+    ]
+  }
+}
