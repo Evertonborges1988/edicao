@@ -35,14 +35,11 @@ Nos **Lançamentos**, o círculo à esquerda marca como pago/recebido com um toq
 
 ## Trazer os dados da planilha
 
-Gere o arquivo no computador (a planilha precisa estar **sem senha**):
+No app: **Ajustes → Importar a planilha (.xlsx)**, escolha o arquivo do Excel e, se tiver senha, digite.
+O arquivo é lido **dentro do celular**; a senha não é salva nem enviada para a internet.
 
-```bash
-python3 -m pip install openpyxl
-python3 financas/tools/converter_planilha.py Planilha_Borges.xlsx dados-importar.json
-```
-
-No app: **Ajustes → Importar da planilha** e escolha o `dados-importar.json`. Não envie esse arquivo para o GitHub (já está no `.gitignore`).
+- Pode importar de novo sempre que a planilha for atualizada: o que veio da planilha é atualizado (sem duplicar) e o que foi lançado direto no app permanece.
+- Não precisa converter nada. O conversor em `tools/` (`converter_planilha.py`) é opcional e serve só para gerar um `.json` de backup/uso avançado.
 
 ## Usar nos dois celulares (sincronização)
 

@@ -348,8 +348,11 @@ function telaAjustes() {
     <div class="card"><div class="seg">${[["auto", "Automático"], ["light", "Claro"], ["dark", "Escuro"]].map(([k, n]) => `<button class="${cfg.tema === k ? "on" : ""}" data-act="tema" data-k="${k}">${n}</button>`).join("")}</div></div>
     <h2>Dados (${total} lançamentos)</h2>
     <div class="card">
-      <button class="btn sec" data-act="importar">Importar da planilha (arquivo .json)</button>
-      <input type="file" id="arq" accept="application/json,.json" hidden>
+      <button class="btn" data-act="importar-xlsx">Importar a planilha (.xlsx)</button>
+      <input type="file" id="arq-xlsx" hidden>
+      <div class="muted sm" style="margin:8px 4px 12px">Escolha o arquivo da planilha do Excel, com ou sem senha. Ele é lido só neste celular. Pode importar de novo quando a planilha for atualizada: o que veio da planilha é atualizado, e o que você lançou aqui no app fica como está.</div>
+      <button class="btn sec" data-act="importar">Restaurar backup do app (.json)</button>
+      <input type="file" id="arq" hidden>
       <button class="btn sec" style="margin-top:8px" data-act="exportar">Baixar backup (.json)</button>
       <button class="btn sec" style="margin-top:8px" data-act="exportar-csv">Baixar tudo em planilha (.csv)</button>
       <button class="btn perigo" style="margin-top:8px" data-act="apagar">Apagar dados deste celular</button></div>
@@ -472,6 +475,57 @@ function baixar(nome, texto, tipo) {
   const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([texto], { type: tipo })); a.download = nome;
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
+/* ---------- importar a planilha .xlsx (lida no próprio aparelho) ---------- */
+let IMP = null;
+const carregarScript = src => new Promise((ok, falha) => {
+  const s = document.createElement("script"); s.src = src; s.onload = ok;
+  s.onerror = () => falha(new Error("Não consegui carregar o leitor de planilhas. Confira a internet e tente de novo."));
+  document.head.appendChild(s);
+});
+async function abrirImportacao(arq) {
+  let buf; try { buf = await arq.arrayBuffer(); } catch { return aviso("Não consegui abrir o arquivo."); }
+  const b = new Uint8Array(buf.slice(0, 4));
+  const cript = b[0] === 0xD0 && b[1] === 0xCF && b[2] === 0x11 && b[3] === 0xE0;
+  const xlsx = b[0] === 0x50 && b[1] === 0x4b;
+  if (!cript && !xlsx) return aviso("Esse arquivo não é uma planilha .xlsx.");
+  IMP = { buf, nome: arq.name, cript, rodando: false };
+  const el = $("#sheet"); el.hidden = false; document.body.style.overflow = "hidden";
+  el.innerHTML = `<div class="folha" role="dialog" aria-modal="true" aria-label="Importar planilha">
+    <div class="puxador"></div>
+    <div class="cab"><b>Importar planilha</b><button class="icon-btn" data-act="fechar-imp" aria-label="Fechar">${ICON.x}</button></div>
+    <div class="card" style="margin-bottom:14px"><div style="font-weight:600;word-break:break-all">${esc(arq.name)}</div><div class="muted sm">${(arq.size / 1024).toFixed(0)} KB${cript ? " · protegida por senha" : ""}</div></div>
+    ${cript ? `<div class="campo"><label for="imp-senha">Senha da planilha</label><input id="imp-senha" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Digite a senha"></div>
+      <div class="muted sm" style="margin:-6px 4px 14px">A senha é usada só para abrir o arquivo neste celular. Ela não é salva nem enviada para a internet.</div>` : ""}
+    <div class="erro" id="imp-erro" role="alert" hidden></div>
+    <div class="muted sm" id="imp-status" style="margin:0 4px 12px" hidden></div>
+    <button class="btn" data-act="imp-go" id="imp-btn">Importar</button></div>`;
+  if (cript) setTimeout(() => $("#imp-senha")?.focus(), 80);
+}
+async function rodarImportacao() {
+  if (!IMP || IMP.rodando) return;
+  const senha = $("#imp-senha")?.value || "", err = $("#imp-erro"), st = $("#imp-status"), btn = $("#imp-btn");
+  if (IMP.cript && !senha) { err.hidden = false; err.textContent = "Digite a senha."; return; }
+  err.hidden = true; IMP.rodando = true; btn.disabled = true; btn.textContent = "Abrindo…";
+  st.hidden = false; st.textContent = IMP.cript ? "Abrindo a planilha. Isso pode levar até 30 segundos, aguarde…" : "Lendo a planilha…";
+  await new Promise(r => setTimeout(r, 50)); // deixa a mensagem aparecer
+  try {
+    if (!window.XLSX) await carregarScript("vendor/xlsx.full.min.js");
+    if (!window.FinImport) await carregarScript("importar-xlsx.js");
+    const r = await window.FinImport.ler(IMP.buf, senha, { cartoes: cfg.cartoes, mesAtual: mesDe(hoje()) });
+    const novos = [...r.despesas, ...r.receitas];
+    const agora = Date.now(), ids = new Set(novos.map(x => x.id)); let removidos = 0;
+    for (const x of items) if (x.src === "xlsx" && !x._del && !ids.has(x.id)) { x._del = true; x._u = agora; removidos++; }
+    const mapa = new Map(items.map(x => [x.id, x]));
+    for (const x of novos) { x.src = "xlsx"; x._u = agora; mapa.set(x.id, x); }
+    items = [...mapa.values()]; invalidar(); salvarItens();
+    IMP = null; const el = $("#sheet"); el.hidden = true; el.innerHTML = ""; document.body.style.overflow = "";
+    mes = mesDe(hoje()); view = "home"; render(); window.scrollTo(0, 0);
+    aviso(`Pronto! ${r.despesas.length} despesas e ${r.receitas.length} receitas de ${r.meses} meses${removidos ? ` (${removidos} removidos)` : ""}`);
+  } catch (e) {
+    IMP.rodando = false; btn.disabled = false; btn.textContent = "Importar"; st.hidden = true;
+    err.hidden = false; err.textContent = e.message || "Não consegui importar.";
+  }
+}
 function importarJson(txt) {
   let j; try { j = JSON.parse(txt); } catch { return aviso("Arquivo inválido."); }
   const novos = [...(j.despesas || []), ...(j.receitas || [])];
@@ -511,6 +565,9 @@ document.addEventListener("click", e => {
     faixa: () => { faixa = el.dataset.k; render(); },
     tema: () => { cfg.tema = el.dataset.k; salvarCfg(); aplicarTema(); render(); },
     importar: () => $("#arq").click(),
+    "importar-xlsx": () => $("#arq-xlsx").click(),
+    "imp-go": () => rodarImportacao(),
+    "fechar-imp": () => { IMP = null; F = null; renderSheet(); },
     exportar: () => baixar(`financas-backup-${hoje()}.json`, JSON.stringify({ versao: 1, despesas: vivos().filter(x => x.k === "d"), receitas: vivos().filter(x => x.k === "r") }), "application/json"),
     "exportar-csv": () => {
       const cab = ["tipo", "mes", "vencimento", "data_compra", "tipo_despesa", "categoria", "fornecedor", "descricao", "parcela", "total_parcelas", "valor", "pago"];
@@ -541,6 +598,7 @@ document.addEventListener("change", e => {
   if (t.id === "fcat") { filtro.cat = t.value; $("#lista").innerHTML = htmlLista(); }
   else if (t.id === "fforn") { filtro.forn = t.value; $("#lista").innerHTML = htmlLista(); }
   else if (t.id === "arq" && t.files[0]) { t.files[0].text().then(importarJson); t.value = ""; }
+  else if (t.id === "arq-xlsx" && t.files[0]) { abrirImportacao(t.files[0]); t.value = ""; }
   else if (t.dataset?.meta) { cfg.metas[t.dataset.meta] = Math.max(0, Math.min(100, parseNum(t.value))); salvarCfg(); }
   else if (t.id === "cartoes") { cfg.cartoes = t.value.split(",").map(s => s.trim()).filter(Boolean); salvarCfg(); invalidar(); }
   // Atenção: nestes casos NÃO redesenhar a folha — o "change" dispara ao sair do campo, no meio do toque
