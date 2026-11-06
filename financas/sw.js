@@ -1,5 +1,5 @@
 // Cache do app para funcionar sem internet. Os dados ficam no aparelho (localStorage).
-const V = "financas-v2";
+const V = "financas-v3";
 const ARQUIVOS = ["./", "./index.html", "./styles.css", "./app.js", "./manifest.webmanifest",
   "./importar-xlsx.js", "./vendor/xlsx.full.min.js", "./icons/icon.svg", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png"];
 

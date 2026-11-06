@@ -807,13 +807,16 @@ async function sincronizar(manual) {
       await supaReq("lancamentos?on_conflict=id", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(lote) });
     }
     if (sujos.length) sp().lastPush = Math.max(...sujos.map(x => x._u));
-    let desde = sp().lastPull, mudou = 0;
+    // paginação por offset com ordem estável (atualizado, id): muitas linhas podem ter o mesmo "atualizado"
+    // (ex.: importação inicial), e "gt" sozinho parava após a 1ª página de 1000.
+    const base = sp().lastPull; let desde = base, mudou = 0, off = 0;
     for (;;) {
-      const rows = await supaReq(`lancamentos?select=id,dados,atualizado,apagado&atualizado=gt.${desde}&order=atualizado.asc&limit=1000`);
+      const rows = await supaReq(`lancamentos?select=id,dados,atualizado,apagado&atualizado=gte.${base}&order=atualizado.asc,id.asc&limit=1000&offset=${off}`);
       if (!rows?.length) break;
       const mapa = new Map(items.map(x => [x.id, x]));
       for (const r of rows) { const l = mapa.get(r.id); if (!l || r.atualizado > (l._u || 0)) { mapa.set(r.id, { ...r.dados, _u: r.atualizado, _del: r.apagado }); mudou++; } desde = Math.max(desde, r.atualizado); }
       items = [...mapa.values()]; if (rows.length < 1000) break;
+      off += rows.length;
     }
     sp().lastPull = desde; if (mudou) { invalidar(); gravar(LS_ITEMS, items); }
     salvarCfg(); syncMsg = `última sincronização às ${new Date().toTimeString().slice(0, 5)}`;
