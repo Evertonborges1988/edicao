@@ -328,7 +328,7 @@ function telaAjustes() {
     <h2>Sincronizar com a esposa</h2>
     <div class="card">
       <div class="status-sync"><span class="dot ${conectado ? "on" : ""}"></span><span>${conectado ? "Conectado — os dois celulares usam os mesmos dados" : "Não conectado — dados só neste celular"}</span></div>
-      ${conectado ? `<div class="muted sm" style="margin-bottom:12px">${esc(sp.email)} · ${syncMsg || "pronto"}</div>
+      ${conectado ? `<div class="muted sm" style="margin-bottom:12px">${esc(sp.email)} · ${syncMsg || "pronto"} · ${items.length} lançamentos · v4</div>
         <button class="btn sec" data-act="sync-agora">Sincronizar agora</button>
         <button class="btn sec" style="margin-top:8px" data-act="desconectar">Desconectar</button>`
       : `<div class="muted sm" style="margin-bottom:12px">Veja o passo a passo no arquivo <b>LEIA-ME.md</b> (leva ~10 min, uma vez só).</div>
