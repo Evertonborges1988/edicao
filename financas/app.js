@@ -305,6 +305,7 @@ function telaAnalise() {
       <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px;gap:10px">
         <div><div class="muted sm">Despesas</div><div class="num" style="font-size:26px;font-weight:700">${brl(R.despesas)}</div></div>
         <div style="text-align:right">${ant.despesas ? badgeVar(dTot) : '<span class="badge">sem mês anterior</span>'}<div class="muted sm" style="margin-top:4px">antes: ${brl(ant.despesas)}</div></div></div></div>
+    <button class="btn" style="margin-top:12px" data-act="analise">✨ Analisar este mês com o Claude</button>
     <h2>Evolução</h2>
     <div class="seg" style="margin-bottom:10px"><button class="${faixa === "6" ? "on" : ""}" data-act="faixa" data-k="6">6 meses</button><button class="${faixa === "12" ? "on" : ""}" data-act="faixa" data-k="12">12 meses</button><button class="${faixa === "prox" ? "on" : ""}" data-act="faixa" data-k="prox">Próximos 6</button></div>
     <div class="card"><div class="rot">Receitas × despesas</div>${colChart(ms, [{ nome: "Receitas", cor: "s1", vals: S.map(s => s.R.receitas) }, { nome: "Despesas", cor: "s2", vals: S.map(s => s.R.despesas) }])}</div>
@@ -475,6 +476,153 @@ function baixar(nome, texto, tipo) {
   const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([texto], { type: tipo })); a.download = nome;
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
+/* ---------- análise aprofundada com o Claude ---------- */
+let AN = null;
+const t$ = n => brl(n).replace(/ /g, " ");
+const sgn = n => (n > 0 ? "+" : n < 0 ? "−" : "") + t$(Math.abs(n));
+const pct = (a, b) => b > 0 ? (a / b * 100).toFixed(0) + "%" : "–";
+
+function gerarRelatorio(m, { lanc = true, pergunta = "" } = {}) {
+  const R = resumoMes(m), ant = resumoMes(addMes(m, -1));
+  const hist = Array.from({ length: 12 }, (_, i) => addMes(m, i - 11)).map(x => ({ m: x, R: resumoMes(x) }));
+  const com = hist.filter(h => h.m < m && (h.R.despesas > 0 || h.R.receitas > 0));
+  const media = (campo, n) => { const a = com.slice(-n); return a.length ? a.reduce((s, h) => s + h.R[campo], 0) / a.length : 0; };
+  const emAndamento = m >= mesDe(hoje());
+  const L = [];
+  const P = (...x) => L.push(x.join(""));
+
+  P("# PAPEL");
+  P("Você é meu analista financeiro familiar (sou o Tom; minha esposa é a Bi). Analise com rigor, em português do Brasil, sem inventar nada que não esteja nos dados abaixo. Se faltar informação, diga o que falta e pergunte.");
+  P("Depois da análise, continue disponível: vou fazer perguntas sobre estes números. Responda sempre com base nos dados, mostrando as contas. Se precisar de mais detalhe (ex.: outro mês, uma categoria, um cartão), peça que eu envio.");
+  P("");
+  P("# O QUE EU QUERO NA ANÁLISE");
+  P("1. Diagnóstico do mês: como fechamos, o que está bom e o que preocupa (com números).");
+  P("2. O que mudou em relação ao mês anterior e à média dos últimos 6 meses, e a provável causa de cada mudança relevante.");
+  P("3. Gastos fora do padrão, possíveis duplicidades, lançamentos suspeitos ou categorias mal classificadas.");
+  P("4. Aderência às metas (dízimo " + cfg.metas.dizimo + "%, fixas " + cfg.metas.fixas + "%, variáveis " + cfg.metas.variaveis + "%, guardar " + cfg.metas.guardar + "% da receita) e o quanto falta/sobra em reais.");
+  P("5. Compromissos futuros: parcelas e contas já previstas para os próximos meses, quando ficam mais apertados e quando respiramos.");
+  P("6. Cartões: qual pesa mais, e se há concentração de risco.");
+  P("7. Plano de ação: 5 ações práticas e priorizadas para o próximo mês, com impacto estimado em reais.");
+  P("8. Perguntas que você faria para entender melhor nossos hábitos.");
+  P("");
+  P("# COMO LER OS DADOS");
+  P("- Valores em R$. \"Despesas\" NÃO inclui \"Guardado\" (transferências entre contas e sobra enviada à poupança, fornecedor \"Casa dos Borges\"); guardado é tratado à parte.");
+  P("- Sobra = saldo anterior + receitas − despesas − guardado. Nos meses fechados costuma ser R$ 0,00 porque tudo é distribuído; sobra negativa em mês futuro/andamento significa que falta cobrir.");
+  P("- \"Fixas\" = despesas do tipo Fixo (sem o dízimo); \"Variáveis\" = tipo Variável. Dízimo é separado.");
+  P("- Cartões (fatura entra no mês do vencimento): " + cfg.cartoes.join(", ") + ".");
+  P("- Mês analisado: " + mesNome(m) + ". Hoje é " + fmtDia(hoje()) + "/" + hoje().slice(0, 4) + "." + (emAndamento ? " ATENÇÃO: este mês ainda não terminou/está em planejamento, então os números podem estar incompletos." : ""));
+  P("");
+
+  P("# 1. RESUMO DE " + mesNome(m).toUpperCase());
+  P("Receitas: ", t$(R.receitas), (R.saldoAnt ? ` (+ saldo anterior ${t$(R.saldoAnt)})` : ""));
+  P("Despesas: ", t$(R.despesas), ` — fixas ${t$(R.fixas)}, dízimo ${t$(R.dizimo)}, variáveis ${t$(R.variaveis)}`);
+  P("Guardado/transferido: ", t$(R.guardado));
+  P("Sobra: ", t$(R.sobra));
+  P("Já pago: ", t$(R.pago), " (", pct(R.pago, R.despesas), " das despesas) | Falta pagar: ", t$(R.pendente));
+  P("Metas sobre a receita (", t$(R.receitas), "): dízimo ", pct(R.dizimo, R.receitas), " (meta ", cfg.metas.dizimo, "%) | fixas ", pct(R.fixas, R.receitas), " (meta ", cfg.metas.fixas, "%) | variáveis ", pct(R.variaveis, R.receitas), " (meta ", cfg.metas.variaveis, "%) | guardado ", pct(R.guardado, R.receitas), " (meta ", cfg.metas.guardar, "%)");
+  P("");
+
+  P("# 2. HISTÓRICO DOS ÚLTIMOS 12 MESES");
+  P("mês | receitas | despesas | fixas+dízimo | variáveis | guardado | sobra");
+  for (const h of hist) P(h.m, " | ", t$(h.R.receitas), " | ", t$(h.R.despesas), " | ", t$(h.R.fixas + h.R.dizimo), " | ", t$(h.R.variaveis), " | ", t$(h.R.guardado), " | ", t$(h.R.sobra));
+  P("Médias (meses com dados): despesas 3m ", t$(media("despesas", 3)), " | 6m ", t$(media("despesas", 6)), " | 12m ", t$(media("despesas", 12)), "; receitas 6m ", t$(media("receitas", 6)), "; variáveis 6m ", t$(media("variaveis", 6)), "; guardado 6m ", t$(media("guardado", 6)));
+  P("");
+
+  P("# 3. CATEGORIAS: MÊS × MÊS ANTERIOR × MÉDIA 6 MESES");
+  const ms6 = com.slice(-6).map(h => Object.fromEntries(porCategoria(h.R.gastos)));
+  const cAt = Object.fromEntries(porCategoria(R.gastos)), cAn = Object.fromEntries(porCategoria(ant.gastos));
+  const cats = [...new Set([...Object.keys(cAt), ...Object.keys(cAn), ...ms6.flatMap(o => Object.keys(o))])].map(c => {
+    const med = ms6.length ? ms6.reduce((s, o) => s + (o[c] || 0), 0) / ms6.length : 0; return [c, cAt[c] || 0, cAn[c] || 0, med];
+  }).sort((a, b) => Math.max(b[1], b[3]) - Math.max(a[1], a[3])).slice(0, 18);
+  P("categoria | mês | % das despesas | mês anterior | média 6m | diferença vs média");
+  for (const [c, a, b, md] of cats) P(c, " | ", t$(a), " | ", pct(a, R.despesas), " | ", t$(b), " | ", t$(md), " | ", sgn(a - md));
+  P("");
+
+  P("# 4. CARTÕES (FATURA DO MÊS)");
+  const fA = Object.fromEntries(porForn(R.gastos)), fB = Object.fromEntries(porForn(ant.gastos));
+  for (const c of [...new Set([...Object.keys(fA), ...Object.keys(fB)])]) P(c, ": ", t$(fA[c] || 0), " (mês anterior ", t$(fB[c] || 0), ")");
+  P("");
+
+  P("# 5. MAIORES DESPESAS DO MÊS");
+  const lin = x => `${fmtDia(x.venc)} | ${x.cat || "-"} | ${x.forn || "-"} | ${x.desc}${x.tparc > 1 ? ` (${x.parc}/${x.tparc})` : ""} | ${t$(x.valor)}`;
+  R.gastos.slice().sort((a, b) => b.valor - a.valor).slice(0, 15).forEach(x => P(lin(x)));
+  P("");
+
+  P("# 6. CONTAS FIXAS DO MÊS (com variação sobre o mês anterior)");
+  const antFix = new Map(ant.gastos.filter(x => x.tipo === "Fixo").map(x => [norm(x.desc) + "|" + norm(x.forn), x.valor]));
+  R.gastos.filter(x => x.tipo === "Fixo").sort((a, b) => b.valor - a.valor).forEach(x => {
+    const a = antFix.get(norm(x.desc) + "|" + norm(x.forn)); P(x.desc, " (", x.forn || "-", "): ", t$(x.valor), a == null ? " [novo/sem correspondente]" : ` [mês anterior ${t$(a)}, ${sgn(x.valor - a)}]`);
+  });
+  P("");
+
+  P("# 7. PARCELAMENTOS E COMPROMISSOS FUTUROS");
+  const parc = R.gastos.filter(x => x.tparc > 1 && x.parc <= x.tparc).sort((a, b) => b.valor - a.valor);
+  const restante = parc.reduce((s, x) => s + (x.tparc - x.parc) * x.valor, 0);
+  P("Parcelas ativas neste mês: ", parc.length, " somando ", t$(parc.reduce((s, x) => s + x.valor, 0)), " por mês. Ainda a pagar depois deste mês (estimativa = parcelas restantes × valor atual): ", t$(restante));
+  P("descrição | cartão/fornecedor | parcela | valor da parcela | parcelas restantes | total restante");
+  parc.slice(0, 40).forEach(x => P(x.desc, " | ", x.forn || "-", " | ", x.parc, "/", x.tparc, " | ", t$(x.valor), " | ", x.tparc - x.parc, " | ", t$((x.tparc - x.parc) * x.valor)));
+  P("Previsão já lançada na planilha para os próximos meses (pode estar incompleta; só inclui o que já foi lançado):");
+  for (let i = 1; i <= 6; i++) { const mm = addMes(m, i), r = resumoMes(mm); P(mm, ": receitas ", t$(r.receitas), " | despesas ", t$(r.despesas), " | guardado ", t$(r.guardado), " | sobra ", t$(r.sobra)); }
+  P("");
+
+  P("# 8. PENDENTES (NÃO PAGAS) DE " + mesNome(m).toUpperCase());
+  const pend = R.gastos.filter(x => !x.pago && x.valor > 0).sort((a, b) => (a.venc || "").localeCompare(b.venc || ""));
+  if (!pend.length) P("Nenhuma."); pend.forEach(x => P(lin(x), x.venc && x.venc < hoje() ? " [ATRASADA]" : ""));
+  P("");
+
+  P("# 9. RECEITAS DO MÊS");
+  vivos().filter(x => x.k === "r" && x.mes === m).sort((a, b) => (a.venc || "").localeCompare(b.venc || "")).forEach(x => P(fmtDia(x.venc), " | ", x.desc, " | ", t$(x.valor), x.carry ? " [saldo anterior]" : "", x.pago ? "" : " [a receber]"));
+  P("");
+
+  if (lanc) {
+    P("# 10. TODOS OS LANÇAMENTOS DO MÊS (data | tipo | categoria | cartão/fornecedor | descrição | valor | pago)");
+    vivos().filter(x => x.mes === m).sort((a, b) => (a.venc || "").localeCompare(b.venc || "")).forEach(x =>
+      P(fmtDia(x.venc), " | ", x.k === "r" ? "Receita" : (x.transf ? "Guardado" : x.tipo), " | ", x.cat || "-", " | ", x.forn || "-", " | ", x.desc, x.tparc > 1 ? ` (${x.parc}/${x.tparc})` : "", " | ", t$(x.valor), " | ", x.pago ? "sim" : "não"));
+    P("");
+  }
+  if (pergunta.trim()) { P("# MINHA PERGUNTA / FOCO"); P(pergunta.trim()); P(""); }
+  P("# AGORA");
+  P("Faça a análise completa seguindo os 8 pontos acima, destacando primeiro o mais importante. Termine perguntando o que eu quero aprofundar.");
+  return L.join("\n");
+}
+
+function abrirAnalise() { AN = { m: mes, lanc: true, pergunta: "" }; renderAnalise(); }
+function renderAnalise() {
+  const el = $("#sheet"); el.hidden = false; document.body.style.overflow = "hidden";
+  const txt = gerarRelatorio(AN.m, AN);
+  AN.txt = txt;
+  el.innerHTML = `<div class="folha" role="dialog" aria-modal="true" aria-label="Analisar com o Claude">
+    <div class="puxador"></div>
+    <div class="cab"><b>Analisar com o Claude</b><button class="icon-btn" data-act="fechar-imp" aria-label="Fechar">${ICON.x}</button></div>
+    <div class="card" style="margin-bottom:14px"><div style="font-weight:650">${mesNome(AN.m)}</div>
+      <div class="muted sm" style="margin-top:4px">Gera um relatório completo (resumo, 12 meses, categorias, cartões, parcelas, pendências e metas) e já pede ao Claude que atue como seu analista e responda suas perguntas.</div></div>
+    <div class="campo"><label for="an-perg">Sua pergunta ou foco (opcional)</label>
+      <input id="an-perg" value="${esc(AN.pergunta)}" placeholder="Ex.: Por que gastamos mais com mercado? Dá para guardar mais?" autocomplete="off"></div>
+    <button class="tgl" data-act="an-lanc"><span>Incluir todos os lançamentos do mês</span><span class="sw ${AN.lanc ? "on" : ""}"></span></button>
+    <div class="muted sm" id="an-tam" style="margin:0 4px 12px"></div>
+    <button class="btn" data-act="an-copiar">Copiar relatório</button>
+    ${navigator.share ? `<button class="btn sec" style="margin-top:8px" data-act="an-share">Compartilhar…</button>` : ""}
+    <div class="card" style="margin-top:14px"><b>Como usar</b><ol class="sm" style="margin:8px 0 0;padding-left:20px;line-height:1.6">
+      <li>Toque em <b>Copiar relatório</b>.</li><li>Abra o app do <b>Claude</b> e inicie uma conversa nova.</li><li><b>Cole</b> e envie. Ele analisa e depois você faz suas perguntas ali mesmo.</li></ol>
+      <div class="muted sm" style="margin-top:8px">Os dados só saem do app quando você cola no Claude.</div></div>
+    <details style="margin-top:10px"><summary>Ver o texto que será copiado</summary><textarea id="an-txt" readonly style="width:100%;height:220px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:10px;font-size:12px"></textarea></details></div>`;
+  $("#an-txt").value = txt; atualizarTamanhoRelatorio();
+}
+function atualizarTamanhoRelatorio() {
+  if (!AN) return; AN.txt = gerarRelatorio(AN.m, AN);
+  const t = $("#an-tam"), ta = $("#an-txt"); if (ta) ta.value = AN.txt;
+  if (t) t.textContent = `${AN.txt.split("\n").length} linhas · ${(AN.txt.length / 1000).toFixed(0)} mil caracteres`;
+}
+async function copiarRelatorio() {
+  atualizarTamanhoRelatorio();
+  try { await navigator.clipboard.writeText(AN.txt); aviso("Copiado! Cole no Claude."); }
+  catch { const ta = $("#an-txt"); ta.parentElement.open = true; ta.focus(); ta.select(); try { document.execCommand("copy"); aviso("Copiado! Cole no Claude."); } catch { aviso("Selecione o texto e copie manualmente."); } }
+}
+async function compartilharRelatorio() {
+  atualizarTamanhoRelatorio();
+  try { await navigator.share({ title: `Finanças ${mesNome(AN.m)}`, text: AN.txt }); } catch { /* cancelado */ }
+}
+
 /* ---------- importar a planilha .xlsx (lida no próprio aparelho) ---------- */
 let IMP = null;
 const carregarScript = src => new Promise((ok, falha) => {
@@ -567,7 +715,11 @@ document.addEventListener("click", e => {
     importar: () => $("#arq").click(),
     "importar-xlsx": () => $("#arq-xlsx").click(),
     "imp-go": () => rodarImportacao(),
-    "fechar-imp": () => { IMP = null; F = null; renderSheet(); },
+    "fechar-imp": () => { IMP = null; AN = null; F = null; renderSheet(); },
+    analise: () => abrirAnalise(),
+    "an-lanc": () => { AN.lanc = !AN.lanc; renderAnalise(); },
+    "an-copiar": () => copiarRelatorio(),
+    "an-share": () => compartilharRelatorio(),
     exportar: () => baixar(`financas-backup-${hoje()}.json`, JSON.stringify({ versao: 1, despesas: vivos().filter(x => x.k === "d"), receitas: vivos().filter(x => x.k === "r") }), "application/json"),
     "exportar-csv": () => {
       const cab = ["tipo", "mes", "vencimento", "data_compra", "tipo_despesa", "categoria", "fornecedor", "descricao", "parcela", "total_parcelas", "valor", "pago"];
@@ -584,6 +736,7 @@ document.addEventListener("click", e => {
 document.addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.matches?.('.item[data-act="editar"]')) { e.preventDefault(); e.target.click(); } if (e.key === "Escape" && F) { F = null; renderSheet(); } });
 document.addEventListener("input", e => {
   const t = e.target;
+  if (t.id === "an-perg") { AN.pergunta = t.value; atualizarTamanhoRelatorio(); return; }
   if (t.id === "q") { filtro.q = t.value; $("#lista").innerHTML = htmlLista(); return; }
   if (!F) return;
   if (t.id === "f-valor") { F.valorTxt = t.value; const c = $(".calc"); if (c) { const v = parseNum(t.value); c.textContent = !F.editando && F.modo === "parc" && v > 0 ? `${F.n}× de ${brl(F.ehParcela ? v : r2(v / F.n))}` : (!F.editando && F.modo === "mensal" && v > 0 ? `${brl(v)} por mês, por ${F.n} meses` : ""); } }
