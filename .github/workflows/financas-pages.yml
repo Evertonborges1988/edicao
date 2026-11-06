@@ -1,7 +1,7 @@
 name: Publicar Finanças (GitHub Pages)
 on:
   push:
-    branches: [main]
+    branches: [main, claude/video-editor-skill-setup-qh0ka1]
     paths: ["financas/**"]
   workflow_dispatch:
 permissions:

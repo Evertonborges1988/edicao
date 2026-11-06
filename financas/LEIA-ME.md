@@ -28,7 +28,7 @@ Nos **Lançamentos**, o círculo à esquerda marca como pago/recebido com um toq
 ## Colocar no ar (uma vez só)
 
 1. No GitHub: **Settings → Pages → Source: GitHub Actions**. (Páginas gratuitas exigem o repositório público; o app não contém dados seus, só o código.)
-2. Faça o merge desta branch na `main`. O workflow `financas-pages.yml` publica e mostra o endereço, algo como `https://SEU-USUARIO.github.io/edicao/`.
+2. Faça o merge desta branch na branch padrão do repositório. O workflow `financas-pages.yml` publica e mostra o endereço, algo como `https://SEU-USUARIO.github.io/edicao/`.
 3. Abra o endereço no celular:
    - **iPhone (Safari):** Compartilhar → *Adicionar à Tela de Início*.
    - **Android (Chrome):** menu ⋮ → *Instalar aplicativo*.
